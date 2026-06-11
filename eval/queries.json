@@ -1,0 +1,95 @@
+[
+  {
+    "query": "vision pro",
+    "category": "rare",
+    "expected": [36204298, 36204291, 36201608]
+  },
+  {
+    "query": "wireguard",
+    "category": "rare",
+    "expected": [36102580, 36083189, 36069590]
+  },
+  {
+    "query": "worldcoin",
+    "category": "rare",
+    "expected": [36118690, 36078650, 36075711]
+  },
+  {
+    "query": "sqlite",
+    "category": "rare",
+    "expected": [36083801, 36109161]
+  },
+  {
+    "query": "tailwind",
+    "category": "rare",
+    "expected": [36139702, 36133552]
+  },
+  {
+    "query": "zig",
+    "category": "rare",
+    "expected": [36193200, 36184213, 36179909, 36149462]
+  },
+
+  {
+    "query": "postgres",
+    "category": "common",
+    "expected": [36162269, 36149676, 36147624, 36196600]
+  },
+  {
+    "query": "stable diffusion",
+    "category": "common",
+    "expected": [36195156, 36174315, 36149991]
+  },
+  {
+    "query": "firefox",
+    "category": "common",
+    "expected": [36174995, 36143091, 36130554, 36128255, 36085642, 36085641, 36077470, 36073619, 36127288]
+  },
+  {
+    "query": "meta",
+    "category": "common",
+    "expected": [36185394, 36185209, 36181374, 36170153, 36173312, 36171177, 36168702, 36166177]
+  },
+
+  {
+    "query": "pyhton",
+    "category": "misspelled",
+    "expected": [36199404, 36188677]
+  },
+  {
+    "query": "kubernets",
+    "category": "misspelled",
+    "expected": [36202357, 36152766]
+  },
+  {
+    "query": "javascrpt",
+    "category": "misspelled",
+    "expected": [36199232, 36192646, 36164909]
+  },
+  {
+    "query": "machine lerning",
+    "category": "misspelled",
+    "expected": [36196038, 36194868, 36148050, 36194336]
+  },
+  {
+    "query": "nvdia",
+    "category": "misspelled",
+    "expected": [36178885, 36190110, 36186588]
+  },
+
+  {
+    "query": "ai existential risk",
+    "category": "conceptual",
+    "expected": [36136897, 36130767, 36125473, 36085268]
+  },
+  {
+    "query": "image generation models",
+    "category": "conceptual",
+    "expected": [36174315, 36105778, 36078934]
+  },
+  {
+    "query": "local llm",
+    "category": "conceptual",
+    "expected": [36187466, 36191042, 36106417]
+  }
+]
