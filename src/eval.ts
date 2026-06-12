@@ -85,7 +85,7 @@ async function main() {
   }
 
   fs.mkdirSync("eval/results", { recursive: true });
-  const out = `eval/results/${date}.json`;
+  const out = `eval/results/${date}-${count}docs.json`;
   fs.writeFileSync(
     out,
     JSON.stringify(
@@ -101,6 +101,11 @@ async function main() {
     )
   );
   console.log(`\nsnapshot → ${out}`);
+
+  const mem = process.memoryUsage();
+  console.log(
+    `heap: ${(mem.heapUsed / 1024 / 1024).toFixed(0)}MB used / ${(mem.heapTotal / 1024 / 1024).toFixed(0)}MB total, rss: ${(mem.rss / 1024 / 1024).toFixed(0)}MB`
+  );
 }
 
 main();
