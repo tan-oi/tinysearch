@@ -1,4 +1,5 @@
 import { tokenize } from "./analyzer.js";
+import { getTopK } from "./helper.js";
 
 type Doc = {
   id: number;
@@ -80,8 +81,6 @@ export class TinySearch {
       });
     });
 
-    return [...scores.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([id]) => this.docs.get(id)!);
+    return getTopK(scores, 10).map(([, id]) => this.docs.get(id)!);
   }
 }
