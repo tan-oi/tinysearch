@@ -25,6 +25,7 @@ async function buildIndex(file: string) {
     search.addDoc({ id, content: title });
     count++;
   }
+  search.finalize();
   return { search, count, buildMs: performance.now() - t0 };
 }
 

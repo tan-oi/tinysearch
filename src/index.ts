@@ -9,12 +9,21 @@ export class TinySearch {
   private docs: Map<number, Doc>;
   private docLengths: Map<number, number>;
   private totalTokens: number;
-
+  private idf: Map<string, number>;
+  private norm: Map<number, number>;
+  private avgDl: number;
+  k1: number;
+  b: number;
   constructor() {
     this.index = new Map();
     this.docs = new Map();
     this.docLengths = new Map();
     this.totalTokens = 0;
+    this.idf = new Map();
+    this.norm = new Map();
+    this.avgDl = 0;
+    this.k1 = 1.5;
+    this.b = 0.75;
   }
 
   addDoc(doc: Doc) {
@@ -35,22 +44,37 @@ export class TinySearch {
     });
   }
 
+  finalize() {
+    const size = this.docs.size;
+    this.avgDl = size === 0 ? 0 : this.totalTokens / size;
+
+    this.index.forEach((val, token) => {
+      const df = val.size;
+      const idf = Math.log((size - df + 0.5) / (df + 0.5) + 1);
+      this.idf.set(token, idf);
+    });
+
+    this.docs.forEach((doc, id) => {
+      const dl = this.docLengths.get(id) ?? 0;
+      const norm = this.k1 * (1 - this.b + (this.b * dl) / this.avgDl);
+      this.norm.set(id, norm);
+    });
+  }
+
   query(q: string, k1 = 1.5, b = 0.75): Doc[] {
     const words = tokenize(q);
-    const N = this.docs.size;
-    const avgdl = N === 0 ? 0 : this.totalTokens / N;
+    const avgdl = this.avgDl;
     const scores = new Map<number, number>();
 
     words.forEach((word) => {
       const postings = this.index.get(word);
       if (!postings) return;
 
-      const df = postings.size;
-      const idf = Math.log((N - df + 0.5) / (df + 0.5) + 1);
+      const idf = this.idf.get(word)!;
 
       postings.forEach((tf, id) => {
         const dl = this.docLengths.get(id) ?? 0;
-        const norm = tf + k1 * (1 - b + (b * dl) / avgdl);
+        const norm = tf + (this.norm.get(id) ?? 0);
         const score = idf * ((tf * (k1 + 1)) / norm);
         scores.set(id, (scores.get(id) ?? 0) + score);
       });
