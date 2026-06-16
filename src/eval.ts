@@ -11,7 +11,10 @@ const K = 10;
 
 function percentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
-  const i = Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1);
+  const i = Math.min(
+    sorted.length - 1,
+    Math.ceil((p / 100) * sorted.length) - 1
+  );
   return sorted[Math.max(0, i)];
 }
 
@@ -26,6 +29,7 @@ async function buildIndex(file: string) {
     count++;
   }
   search.finalize();
+  search.freeze();
   return { search, count, buildMs: performance.now() - t0 };
 }
 
@@ -40,7 +44,10 @@ async function main() {
   const results: Result[] = [];
   for (const q of queries) {
     const t0 = performance.now();
-    const topIds = search.query(q.query).slice(0, K).map((d) => d.id);
+    const topIds = search
+      .query(q.query)
+      .slice(0, K)
+      .map((d) => d.id);
     const ms = performance.now() - t0;
 
     const hits = q.expected.filter((id) => topIds.includes(id)).length;
@@ -55,9 +62,16 @@ async function main() {
   const pad = (s: string | number, n: number) => String(s).padEnd(n);
   const date = new Date().toISOString().slice(0, 10);
 
-  console.log(`\neval — ${date} — ${count} docs, build ${buildMs.toFixed(0)}ms\n`);
   console.log(
-    pad("category", 13) + pad("queries", 9) + pad("recall@10", 11) + pad("MRR", 7) + pad("p50", 9) + "p99"
+    `\neval — ${date} — ${count} docs, build ${buildMs.toFixed(0)}ms\n`
+  );
+  console.log(
+    pad("category", 13) +
+      pad("queries", 9) +
+      pad("recall@10", 11) +
+      pad("MRR", 7) +
+      pad("p50", 9) +
+      "p99"
   );
 
   const row = (label: string, rs: Result[]) => {
@@ -70,12 +84,17 @@ async function main() {
         pad(recall.toFixed(2), 11) +
         pad(mrr.toFixed(2), 7) +
         pad(percentile(lat, 50).toFixed(2) + "ms", 9) +
-        percentile(lat, 99).toFixed(2) + "ms"
+        percentile(lat, 99).toFixed(2) +
+        "ms"
     );
   };
 
   const categories = [...new Set(results.map((r) => r.category))];
-  for (const c of categories) row(c, results.filter((r) => r.category === c));
+  for (const c of categories)
+    row(
+      c,
+      results.filter((r) => r.category === c)
+    );
   console.log("─".repeat(60));
   row("overall", results);
 
@@ -95,7 +114,13 @@ async function main() {
         corpus,
         docs: count,
         buildMs: Math.round(buildMs),
-        results: results.map(({ query, category, recall, mrr, ms }) => ({ query, category, recall, mrr, ms })),
+        results: results.map(({ query, category, recall, mrr, ms }) => ({
+          query,
+          category,
+          recall,
+          mrr,
+          ms,
+        })),
       },
       null,
       2
@@ -103,9 +128,14 @@ async function main() {
   );
   console.log(`\nsnapshot → ${out}`);
 
+  if (global.gc) global.gc(); // force collection so dropped Maps don't inflate the reading
   const mem = process.memoryUsage();
   console.log(
-    `heap: ${(mem.heapUsed / 1024 / 1024).toFixed(0)}MB used / ${(mem.heapTotal / 1024 / 1024).toFixed(0)}MB total, rss: ${(mem.rss / 1024 / 1024).toFixed(0)}MB`
+    `heap: ${(mem.heapUsed / 1024 / 1024).toFixed(0)}MB used / ${(
+      mem.heapTotal /
+      1024 /
+      1024
+    ).toFixed(0)}MB total, rss: ${(mem.rss / 1024 / 1024).toFixed(0)}MB`
   );
 }
 

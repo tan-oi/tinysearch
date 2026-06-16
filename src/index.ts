@@ -1,3 +1,4 @@
+import fs from "fs";
 import { tokenize } from "./analyzer.js";
 import { getTopK } from "./helper.js";
 
@@ -13,6 +14,10 @@ export class TinySearch {
   private idf: Map<string, number>;
   private norm: Map<number, number>;
   private avgDl: number;
+  private postingDocs: Uint32Array = new Uint32Array(0);
+  private postingTfs: Uint16Array = new Uint16Array(0);
+  private offsets: Map<string, { start: number; len: number }> = new Map();
+
   k1: number;
   b: number;
   constructor() {
@@ -64,23 +69,81 @@ export class TinySearch {
 
   query(q: string, k1 = 1.5, b = 0.75): Doc[] {
     const words = tokenize(q);
-    const avgdl = this.avgDl;
     const scores = new Map<number, number>();
 
     words.forEach((word) => {
-      const postings = this.index.get(word);
-      if (!postings) return;
+      const pos = this.offsets.get(word);
+      if (!pos) return;
 
       const idf = this.idf.get(word)!;
 
-      postings.forEach((tf, id) => {
-        const dl = this.docLengths.get(id) ?? 0;
+      for (let i = pos.start; i < pos.start + pos.len; i++) {
+        //?? to shut eslint for a hwhile
+        const id = this.postingDocs[i] ?? 0;
+        const tf = this.postingTfs[i] ?? 0;
         const norm = tf + (this.norm.get(id) ?? 0);
         const score = idf * ((tf * (k1 + 1)) / norm);
         scores.set(id, (scores.get(id) ?? 0) + score);
-      });
+      }
     });
 
     return getTopK(scores, 10).map(([, id]) => this.docs.get(id)!);
+  }
+
+  freeze() {
+    let total = 0;
+    this.index.forEach((posting) => (total += posting.size));
+
+    this.postingDocs = new Uint32Array(total);
+    this.postingTfs = new Uint16Array(total);
+
+    let cursor = 0;
+    this.index.forEach((posting, token) => {
+      let start = cursor;
+      posting.forEach((tf, docId) => {
+        this.postingDocs[cursor] = docId;
+        this.postingTfs[cursor] = tf;
+
+        cursor++;
+      });
+
+      this.offsets.set(token, { start, len: posting.size });
+    });
+
+    this.index = new Map();
+    this.docLengths = new Map();
+  }
+
+  // write the frozen index to disk: typed arrays as raw binary, the rest as json
+  save(dir: string) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(`${dir}/postingDocs.bin`, Buffer.from(this.postingDocs.buffer));
+    fs.writeFileSync(`${dir}/postingTfs.bin`, Buffer.from(this.postingTfs.buffer));
+    const meta = {
+      avgDl: this.avgDl,
+      offsets: [...this.offsets],
+      idf: [...this.idf],
+      norm: [...this.norm],
+      docs: [...this.docs].map(([id, d]) => [id, d.content]),
+    };
+    fs.writeFileSync(`${dir}/meta.json`, JSON.stringify(meta));
+  }
+
+  // load a frozen index from disk — no ingest, no Map-of-Maps ever built
+  static load(dir: string): TinySearch {
+    const s = new TinySearch();
+
+    const pd = fs.readFileSync(`${dir}/postingDocs.bin`);
+    s.postingDocs = new Uint32Array(pd.buffer.slice(pd.byteOffset, pd.byteOffset + pd.byteLength));
+    const pt = fs.readFileSync(`${dir}/postingTfs.bin`);
+    s.postingTfs = new Uint16Array(pt.buffer.slice(pt.byteOffset, pt.byteOffset + pt.byteLength));
+
+    const meta = JSON.parse(fs.readFileSync(`${dir}/meta.json`, "utf8"));
+    s.avgDl = meta.avgDl;
+    s.offsets = new Map(meta.offsets);
+    s.idf = new Map(meta.idf);
+    s.norm = new Map(meta.norm);
+    s.docs = new Map(meta.docs.map(([id, content]: [number, string]) => [id, { id, content }]));
+    return s;
   }
 }
