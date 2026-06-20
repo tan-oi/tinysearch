@@ -18,6 +18,11 @@ export class TinySearch {
   private postingTfs: Uint16Array = new Uint16Array(0);
   private offsets: Map<string, { start: number; len: number }> = new Map();
 
+  // vector lane: every doc vector laid flat (row i ↔ vectorIds[i]), normalized so dot == cosine
+  private vectors: Float32Array = new Float32Array(0);
+  private vectorIds: Uint32Array = new Uint32Array(0);
+  private dim = 0;
+
   k1: number;
   b: number;
   constructor() {
@@ -67,7 +72,7 @@ export class TinySearch {
     });
   }
 
-  query(q: string, k1 = 1.5, b = 0.75): Doc[] {
+  query(q: string): Doc[] {
     const words = tokenize(q);
     const scores = new Map<number, number>();
 
@@ -78,11 +83,10 @@ export class TinySearch {
       const idf = this.idf.get(word)!;
 
       for (let i = pos.start; i < pos.start + pos.len; i++) {
-        //?? to shut eslint for a hwhile
-        const id = this.postingDocs[i] ?? 0;
-        const tf = this.postingTfs[i] ?? 0;
-        const norm = tf + (this.norm.get(id) ?? 0);
-        const score = idf * ((tf * (k1 + 1)) / norm);
+        const id = this.postingDocs[i]!;
+        const tf = this.postingTfs[i]!;
+        const norm = tf + (this.norm.get(id) ?? 0); // norm already baked k1/b in finalize()
+        const score = idf * ((tf * (this.k1 + 1)) / norm);
         scores.set(id, (scores.get(id) ?? 0) + score);
       }
     });
@@ -114,11 +118,67 @@ export class TinySearch {
     this.docLengths = new Map();
   }
 
-  // write the frozen index to disk: typed arrays as raw binary, the rest as json
+  // hand the engine its embeddings: one flat Float32Array + the docId for each row
+  setVectors(vectors: Float32Array, ids: Uint32Array, dim: number) {
+    this.vectors = vectors;
+    this.vectorIds = ids;
+    this.dim = dim;
+  }
+
+  // persist the vector lane to disk (same idea as save(), for embeddings)
+  saveVectors(dir: string) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(`${dir}/vectors.bin`, Buffer.from(this.vectors.buffer));
+    fs.writeFileSync(
+      `${dir}/vectorIds.bin`,
+      Buffer.from(this.vectorIds.buffer)
+    );
+    fs.writeFileSync(`${dir}/vmeta.json`, JSON.stringify({ dim: this.dim }));
+  }
+
+  loadVectors(dir: string) {
+    const v = fs.readFileSync(`${dir}/vectors.bin`);
+    this.vectors = new Float32Array(
+      v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength)
+    );
+    const ids = fs.readFileSync(`${dir}/vectorIds.bin`);
+    this.vectorIds = new Uint32Array(
+      ids.buffer.slice(ids.byteOffset, ids.byteOffset + ids.byteLength)
+    );
+    this.dim = JSON.parse(fs.readFileSync(`${dir}/vmeta.json`, "utf8")).dim;
+  }
+
+  hasVectors() {
+    return this.vectorIds.length > 0;
+  }
+
+  // brute-force semantic search: dot-product the query against every doc vector, heap the top-k.
+  vectorSearch(queryVec: Float32Array, k = 10): Doc[] {
+    const scores = new Map<number, number>();
+    const dim = this.dim;
+
+    for (let i = 0; i < this.vectorIds.length; i++) {
+      const offset = i * dim;
+      let dot = 0;
+      for (let d = 0; d < dim; d++) {
+        dot += this.vectors[offset + d]! * queryVec[d]!;
+      }
+      scores.set(this.vectorIds[i]!, dot);
+    }
+
+    return getTopK(scores, k).map(([, id]) => this.docs.get(id)!);
+  }
+
   save(dir: string) {
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(`${dir}/postingDocs.bin`, Buffer.from(this.postingDocs.buffer));
-    fs.writeFileSync(`${dir}/postingTfs.bin`, Buffer.from(this.postingTfs.buffer));
+    fs.writeFileSync(
+      `${dir}/postingDocs.bin`,
+      Buffer.from(this.postingDocs.buffer)
+    );
+    fs.writeFileSync(
+      `${dir}/postingTfs.bin`,
+      Buffer.from(this.postingTfs.buffer)
+    );
     const meta = {
       avgDl: this.avgDl,
       offsets: [...this.offsets],
@@ -134,16 +194,22 @@ export class TinySearch {
     const s = new TinySearch();
 
     const pd = fs.readFileSync(`${dir}/postingDocs.bin`);
-    s.postingDocs = new Uint32Array(pd.buffer.slice(pd.byteOffset, pd.byteOffset + pd.byteLength));
+    s.postingDocs = new Uint32Array(
+      pd.buffer.slice(pd.byteOffset, pd.byteOffset + pd.byteLength)
+    );
     const pt = fs.readFileSync(`${dir}/postingTfs.bin`);
-    s.postingTfs = new Uint16Array(pt.buffer.slice(pt.byteOffset, pt.byteOffset + pt.byteLength));
+    s.postingTfs = new Uint16Array(
+      pt.buffer.slice(pt.byteOffset, pt.byteOffset + pt.byteLength)
+    );
 
     const meta = JSON.parse(fs.readFileSync(`${dir}/meta.json`, "utf8"));
     s.avgDl = meta.avgDl;
     s.offsets = new Map(meta.offsets);
     s.idf = new Map(meta.idf);
     s.norm = new Map(meta.norm);
-    s.docs = new Map(meta.docs.map(([id, content]: [number, string]) => [id, { id, content }]));
+    s.docs = new Map(
+      meta.docs.map(([id, content]: [number, string]) => [id, { id, content }])
+    );
     return s;
   }
 }

@@ -4,11 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "ingest": "tsx src/ingest.ts",
+    "test": "vitest run",
     "find": "tsx src/find.ts",
     "top": "tsx src/top.ts",
-    "eval": "tsx src/eval.ts"
+    "eval": "tsx src/eval.ts",
+    "vec": "tsx src/vec.ts",
+    "demo": "tsx src/demo.ts"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +22,7 @@
     "vitest": "^4.1.7"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "double-metaphone": "^2.0.1"
   }
 }
