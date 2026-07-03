@@ -1,0 +1,134 @@
+{
+  "date": "2026-06-30T21:34:11.807Z",
+  "corpus": "data/hn-10k.jsonl",
+  "docs": 10000,
+  "buildMs": 83,
+  "results": [
+    {
+      "query": "vision pro",
+      "category": "rare",
+      "recall": 0.6666666666666666,
+      "mrr": 1,
+      "ms": 0.2271250000000009
+    },
+    {
+      "query": "wireguard",
+      "category": "rare",
+      "recall": 0.1875,
+      "mrr": 1,
+      "ms": 0.016124999999988177
+    },
+    {
+      "query": "worldcoin",
+      "category": "rare",
+      "recall": 0.1875,
+      "mrr": 1,
+      "ms": 0.006166000000007443
+    },
+    {
+      "query": "sqlite",
+      "category": "rare",
+      "recall": 0.11764705882352941,
+      "mrr": 0.5,
+      "ms": 0.007457999999985532
+    },
+    {
+      "query": "tailwind",
+      "category": "rare",
+      "recall": 0.3333333333333333,
+      "mrr": 0.5,
+      "ms": 0.0072920000000067375
+    },
+    {
+      "query": "zig",
+      "category": "rare",
+      "recall": 0.21428571428571427,
+      "mrr": 1,
+      "ms": 0.02199999999999136
+    },
+    {
+      "query": "postgres",
+      "category": "common",
+      "recall": 0.125,
+      "mrr": 0.2,
+      "ms": 0.00966700000000742
+    },
+    {
+      "query": "stable diffusion",
+      "category": "common",
+      "recall": 0.1111111111111111,
+      "mrr": 0.3333333333333333,
+      "ms": 0.019584000000008928
+    },
+    {
+      "query": "firefox",
+      "category": "common",
+      "recall": 0.25,
+      "mrr": 0.5,
+      "ms": 0.010249999999984993
+    },
+    {
+      "query": "meta",
+      "category": "common",
+      "recall": 0,
+      "mrr": 0,
+      "ms": 0.06245899999998983
+    },
+    {
+      "query": "pyhton",
+      "category": "misspelled",
+      "recall": 0.11764705882352941,
+      "mrr": 1,
+      "ms": 0.03191699999999287
+    },
+    {
+      "query": "kubernets",
+      "category": "misspelled",
+      "recall": 0.15384615384615385,
+      "mrr": 0.3333333333333333,
+      "ms": 0.009417000000013331
+    },
+    {
+      "query": "javascrpt",
+      "category": "misspelled",
+      "recall": 0.08333333333333333,
+      "mrr": 0.3333333333333333,
+      "ms": 0.014457999999990534
+    },
+    {
+      "query": "machine lerning",
+      "category": "misspelled",
+      "recall": 0.16666666666666666,
+      "mrr": 1,
+      "ms": 0.031374999999997044
+    },
+    {
+      "query": "nvdia",
+      "category": "misspelled",
+      "recall": 0.11764705882352941,
+      "mrr": 1,
+      "ms": 0.021083000000004404
+    },
+    {
+      "query": "ai existential risk",
+      "category": "conceptual",
+      "recall": 0.14285714285714285,
+      "mrr": 1,
+      "ms": 0.16775000000001228
+    },
+    {
+      "query": "image generation models",
+      "category": "conceptual",
+      "recall": 0,
+      "mrr": 0,
+      "ms": 0.023917000000011512
+    },
+    {
+      "query": "local llm",
+      "category": "conceptual",
+      "recall": 0,
+      "mrr": 0,
+      "ms": 0.019875000000013188
+    }
+  ]
+}

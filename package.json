@@ -5,11 +5,11 @@
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
-    "find": "tsx src/find.ts",
-    "top": "tsx src/top.ts",
     "eval": "tsx src/eval.ts",
     "vec": "tsx src/vec.ts",
-    "demo": "tsx src/demo.ts"
+    "hybrid": "tsx src/hybrid.ts",
+    "movies:index": "tsx src/movies-index.ts",
+    "movies:search": "tsx src/movies-search.ts"
   },
   "keywords": [],
   "author": "",

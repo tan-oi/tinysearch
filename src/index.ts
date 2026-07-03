@@ -55,6 +55,29 @@ export class TinySearch {
     });
   }
 
+  // BM25F: index several fields with per-field weights instead of one flat blob.
+  // each field's words are counted `weight` times → weighted tf → a title hit
+  // outweighs a plot hit. weighted length feeds avgDl consistently.
+  // finalize/freeze/query are untouched — they just read the (now weighted) tf.
+  addFieldedDoc(id: number, fields: { text: string; weight: number }[]) {
+    this.docs.set(id, { id, content: fields.map((f) => f.text).join(" ") });
+
+    const counts = new Map<string, number>();
+    let weightedLen = 0;
+    for (const { text, weight } of fields) {
+      const tokens = tokenize(text);
+      weightedLen += weight * tokens.length;
+      tokens.forEach((word) => counts.set(word, (counts.get(word) ?? 0) + weight));
+    }
+
+    this.docLengths.set(id, weightedLen);
+    this.totalTokens += weightedLen;
+    counts.forEach((tf, word) => {
+      if (!this.index.has(word)) this.index.set(word, new Map([[id, tf]]));
+      else this.index.get(word)!.set(id, tf);
+    });
+  }
+
   finalize() {
     const size = this.docs.size;
     this.avgDl = size === 0 ? 0 : this.totalTokens / size;
@@ -72,7 +95,7 @@ export class TinySearch {
     });
   }
 
-  query(q: string): Doc[] {
+  query(q: string, k = 10): Doc[] {
     const words = tokenize(q);
     const scores = new Map<number, number>();
 
@@ -91,7 +114,7 @@ export class TinySearch {
       }
     });
 
-    return getTopK(scores, 10).map(([, id]) => this.docs.get(id)!);
+    return getTopK(scores, k).map(([, id]) => this.docs.get(id)!);
   }
 
   freeze() {
@@ -167,6 +190,34 @@ export class TinySearch {
     }
 
     return getTopK(scores, k).map(([, id]) => this.docs.get(id)!);
+  }
+
+  // hybrid search via WEIGHTED RRF: fuse lexical + semantic lanes by rank, weighted per lane.
+  // pull each lane deep (100), score doc by Σ weight/(K+rank), cut to k.
+  // weights let you lean on the stronger lane so a noisy lane can't drag results to the middle.
+  hybridSearch(
+    q: string,
+    queryVec: Float32Array,
+    k = 10,
+    wLex = 1,
+    wVec = 1
+  ): Doc[] {
+    const K = 60;
+    const lexical = this.query(q, 100); // Doc[] ranked: index 0 = rank 1
+    const semantic = this.vectorSearch(queryVec, 100);
+
+    const fused = new Map<number, number>(); // docId → fused RRF score
+    const add = (list: Doc[], w: number) =>
+      list.forEach((doc, i) =>
+        fused.set(doc.id, (fused.get(doc.id) ?? 0) + w / (K + i + 1))
+      );
+    add(lexical, wLex);
+    add(semantic, wVec);
+
+    return [...fused.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, k)
+      .map(([id]) => this.docs.get(id)!);
   }
 
   save(dir: string) {
