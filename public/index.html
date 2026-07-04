@@ -104,8 +104,17 @@
         -webkit-box-orient: vertical;
         overflow: hidden;
       }
-      .r .ov.open {
+      .r.open .ov {
         -webkit-line-clamp: unset;
+      }
+      .r .cast {
+        display: none;
+        color: var(--dim);
+        font-size: 12.5px;
+        margin-top: 6px;
+      }
+      .r.open .cast {
+        display: block;
       }
       .r .more {
         display: inline-block;
@@ -122,6 +131,46 @@
         color: var(--dim);
         padding: 24px 0;
       }
+      .searchrow {
+        display: flex;
+        gap: 8px;
+      }
+      .searchrow .box {
+        flex: 1;
+      }
+      .gobtn {
+        padding: 0 20px;
+        font-size: 15px;
+        font-weight: 600;
+        background: var(--accent);
+        color: #0b0d10;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+      }
+      .gobtn:hover {
+        opacity: 0.9;
+      }
+      .loading {
+        color: var(--dim);
+        padding: 24px 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--line);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
     </style>
   </head>
   <body>
@@ -134,13 +183,16 @@
         <em>"serial killer targeting the seven deadly sins"</em>.
       </p>
 
-      <input
-        id="q"
-        class="box"
-        placeholder="describe a movie, or search a title, actor, director…"
-        autofocus
-        autocomplete="off"
-      />
+      <div class="searchrow">
+        <input
+          id="q"
+          class="box"
+          placeholder="describe a movie, or search a title, actor, director…"
+          autofocus
+          autocomplete="off"
+        />
+        <button id="go" class="gobtn">Search</button>
+      </div>
 
       <div class="modes">
         <div class="mode on" data-m="hybrid">Hybrid</div>
@@ -180,12 +232,12 @@
         };
       });
 
-      let timer,
-        seq = 0;
-      q.addEventListener("input", () => {
-        clearTimeout(timer);
-        timer = setTimeout(run, 180);
+      let seq = 0;
+      // search on Enter or the Search button — not on every keystroke
+      q.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") run();
       });
+      document.getElementById("go").onclick = run;
 
       async function run() {
         const term = q.value.trim();
@@ -194,6 +246,8 @@
           return;
         }
         const mine = ++seq;
+        out.innerHTML =
+          '<div class="loading"><span class="spinner"></span> Searching…</div>';
         const res = await fetch(
           `/search?q=${encodeURIComponent(term)}&mode=${mode}`
         );
@@ -205,27 +259,28 @@
         }
         out.innerHTML = data
           .map((m) => {
-            const ov = esc(m.overview);
-            const long = m.overview && m.overview.length > 140;
+            const cast =
+              m.cast && m.cast.length ? esc(m.cast.join(", ")) : "";
             return `
       <div class="r">
         <div class="t">${esc(m.title)} <span>(${m.year})</span></div>
         <div class="meta">★ ${m.rating} · ${esc(m.genre)} · dir. ${esc(
               m.director
             )}</div>
-        <div class="ov">${ov || "(no plot available)"}</div>
-        ${long ? '<span class="more">▾ read full plot</span>' : ""}
+        <div class="ov">${esc(m.overview) || "(no plot available)"}</div>
+        ${cast ? `<div class="cast">Cast: ${cast}</div>` : ""}
+        <span class="more">▾ more</span>
       </div>`;
           })
           .join("");
       }
-      // click "read full plot" to expand/collapse the plot above it
+      // click "more" to expand the full plot + cast
       out.addEventListener("click", (e) => {
         const btn = e.target.closest(".more");
         if (!btn) return;
-        const ov = btn.previousElementSibling;
-        const open = ov.classList.toggle("open");
-        btn.textContent = open ? "▴ show less" : "▾ read full plot";
+        const card = btn.closest(".r");
+        const open = card.classList.toggle("open");
+        btn.textContent = open ? "▴ less" : "▾ more";
       });
       function esc(s) {
         return (s || "").replace(

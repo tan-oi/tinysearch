@@ -60,7 +60,9 @@ export class TinySearch {
     for (const { text, weight } of fields) {
       const tokens = tokenize(text);
       weightedLen += weight * tokens.length;
-      tokens.forEach((word) => counts.set(word, (counts.get(word) ?? 0) + weight));
+      tokens.forEach((word) =>
+        counts.set(word, (counts.get(word) ?? 0) + weight)
+      );
     }
 
     this.docLengths.set(id, weightedLen);
@@ -89,25 +91,45 @@ export class TinySearch {
   }
 
   query(q: string, k = 10): Doc[] {
-    const words = tokenize(q);
+    // one entry per distinct query word (drop the flat phonetic codes; handled per-word below)
+    const words = [...new Set(tokenize(q).filter((t) => !t.startsWith("ph:")))];
+
+    // phonetic is a FALLBACK, not always-on: use a word's exact token if the index
+    // knows it, else fall back to its phonetic codes (typo tolerance only for unknown
+    // words). stops real words like "shaw" from bleeding into look-alikes like "show".
+    const wordTokens = words.map((w) =>
+      this.offsets.has(w) ? [w] : tokenize(w).filter((t) => t.startsWith("ph:"))
+    );
+
+    // "minimum should match": how many of the words a doc must match
+    const need = words.length <= 2 ? words.length : Math.ceil(words.length * 0.6);
+
     const scores = new Map<number, number>();
+    const matches = new Map<number, number>(); // docId → how many query WORDS it matched
 
-    words.forEach((word) => {
-      const pos = this.offsets.get(word);
-      if (!pos) return;
-
-      const idf = this.idf.get(word)!;
-
-      for (let i = pos.start; i < pos.start + pos.len; i++) {
-        const id = this.postingDocs[i]!;
-        const tf = this.postingTfs[i]!;
-        const norm = tf + (this.norm.get(id) ?? 0); // norm already baked k1/b in finalize()
-        const score = idf * ((tf * (this.k1 + 1)) / norm);
-        scores.set(id, (scores.get(id) ?? 0) + score);
+    wordTokens.forEach((toks) => {
+      const seen = new Set<number>(); // docs this ONE word matched (via exact or phonetic)
+      for (const token of toks) {
+        const pos = this.offsets.get(token);
+        if (!pos) continue;
+        const idf = this.idf.get(token)!;
+        for (let i = pos.start; i < pos.start + pos.len; i++) {
+          const id = this.postingDocs[i]!;
+          const tf = this.postingTfs[i]!;
+          const norm = tf + (this.norm.get(id) ?? 0); // norm already baked k1/b in finalize()
+          scores.set(id, (scores.get(id) ?? 0) + idf * ((tf * (this.k1 + 1)) / norm));
+          seen.add(id);
+        }
       }
+      seen.forEach((id) => matches.set(id, (matches.get(id) ?? 0) + 1));
     });
 
-    return getTopK(scores, k).map(([, id]) => this.docs.get(id)!);
+    const filtered = new Map<number, number>();
+    scores.forEach((score, id) => {
+      if ((matches.get(id) ?? 0) >= need) filtered.set(id, score);
+    });
+
+    return getTopK(filtered, k).map(([, id]) => this.docs.get(id)!);
   }
 
   freeze() {
@@ -208,5 +230,4 @@ export class TinySearch {
       .slice(0, k)
       .map(([id]) => this.docs.get(id)!);
   }
-
 }

@@ -10,16 +10,14 @@ function build(docs: { id: number; content: string }[]) {
   return s;
 }
 
-test("BM25 ranks the doc matching all query terms first", () => {
+test("minimum-should-match: a 2-word query returns only docs with both words", () => {
   const s = build([
-    { id: 1, content: "machine learning is cool" },
-    { id: 2, content: "machine repair manual" },
-    { id: 3, content: "learning to cook" },
+    { id: 1, content: "machine learning is cool" }, // has both
+    { id: 2, content: "machine repair manual" }, // only "machine"
+    { id: 3, content: "learning to cook" }, // only "learning"
   ]);
-  const ids = s.query("machine learning").map((d) => d.id);
-  expect(ids[0]).toBe(1); // doc 1 has both terms → highest score
-  expect(ids).toContain(2); // doc 2 still matches "machine"
-  expect(ids).toContain(3); // doc 3 still matches "learning"
+  // need-most: a 2-word query requires both words → only doc 1 qualifies
+  expect(s.query("machine learning").map((d) => d.id)).toEqual([1]);
 });
 
 test("single-word query returns all docs containing that word", () => {

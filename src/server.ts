@@ -49,6 +49,7 @@ const toResult = (docs: { id: number }[]) =>
       genre: m.genre,
       rating: m.rating,
       overview: m.overview,
+      cast: m.cast,
     };
   });
 
