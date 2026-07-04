@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TinySearch — movie search from scratch</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --card: #181b22;
+        --line: #262b36;
+        --fg: #e6e9ef;
+        --dim: #8b93a7;
+        --accent: #6ea8fe;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+      }
+      .wrap {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 48px 20px 80px;
+      }
+      h1 {
+        font-size: 26px;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: var(--dim);
+        font-size: 14px;
+        margin: 0 0 28px;
+      }
+      .box {
+        width: 100%;
+        padding: 14px 16px;
+        font-size: 17px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        color: var(--fg);
+        outline: none;
+      }
+      .box:focus {
+        border-color: var(--accent);
+      }
+      .modes {
+        display: flex;
+        gap: 8px;
+        margin: 14px 0 6px;
+      }
+      .mode {
+        flex: 1;
+        padding: 9px;
+        text-align: center;
+        font-size: 14px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        color: var(--dim);
+        cursor: pointer;
+        user-select: none;
+      }
+      .mode.on {
+        background: var(--accent);
+        color: #0b0d10;
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .hint {
+        color: var(--dim);
+        font-size: 12.5px;
+        margin: 2px 2px 20px;
+        min-height: 16px;
+      }
+      .r {
+        padding: 14px 0;
+        border-top: 1px solid var(--line);
+      }
+      .r .t {
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .r .t span {
+        color: var(--dim);
+        font-weight: 400;
+      }
+      .r .meta {
+        color: var(--dim);
+        font-size: 13px;
+        margin: 2px 0 4px;
+      }
+      .r .ov {
+        color: #b8c0d0;
+        font-size: 13.5px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .r .ov.open {
+        -webkit-line-clamp: unset;
+      }
+      .r .more {
+        display: inline-block;
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--accent);
+        cursor: pointer;
+        user-select: none;
+      }
+      .r .more:hover {
+        text-decoration: underline;
+      }
+      .empty {
+        color: var(--dim);
+        padding: 24px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>TinySearch</h1>
+      <p class="sub">
+        A hybrid search engine built from scratch — no search libraries.
+        Searching ~1,000 of the most-rated movies on IMDb. Try
+        <em>"a heist inside someone's dreams"</em> or
+        <em>"serial killer targeting the seven deadly sins"</em>.
+      </p>
+
+      <input
+        id="q"
+        class="box"
+        placeholder="describe a movie, or search a title, actor, director…"
+        autofocus
+        autocomplete="off"
+      />
+
+      <div class="modes">
+        <div class="mode on" data-m="hybrid">Hybrid</div>
+        <div class="mode" data-m="lexical">Lexical only</div>
+        <div class="mode" data-m="semantic">Semantic only</div>
+      </div>
+      <div class="hint" id="hint">
+        Hybrid — word-matching (BM25F) + meaning (embeddings), fused by rank.
+      </div>
+
+      <div id="out"></div>
+    </div>
+
+    <script>
+      const HINTS = {
+        hybrid:
+          "Hybrid — word-matching (BM25F) + meaning (embeddings), fused by rank.",
+        lexical:
+          "Lexical only — literal word matching (BM25F). Great for titles, actors, directors; weak on descriptions.",
+        semantic:
+          "Semantic only — meaning via embeddings. Great for describing a plot; can't match exact names.",
+      };
+      let mode = "hybrid";
+      const q = document.getElementById("q");
+      const out = document.getElementById("out");
+      const hint = document.getElementById("hint");
+
+      document.querySelectorAll(".mode").forEach((el) => {
+        el.onclick = () => {
+          document
+            .querySelectorAll(".mode")
+            .forEach((x) => x.classList.remove("on"));
+          el.classList.add("on");
+          mode = el.dataset.m;
+          hint.textContent = HINTS[mode];
+          run();
+        };
+      });
+
+      let timer,
+        seq = 0;
+      q.addEventListener("input", () => {
+        clearTimeout(timer);
+        timer = setTimeout(run, 180);
+      });
+
+      async function run() {
+        const term = q.value.trim();
+        if (!term) {
+          out.innerHTML = "";
+          return;
+        }
+        const mine = ++seq;
+        const res = await fetch(
+          `/search?q=${encodeURIComponent(term)}&mode=${mode}`
+        );
+        const data = await res.json();
+        if (mine !== seq) return; // stale response, ignore
+        if (!data.length) {
+          out.innerHTML = '<div class="empty">No results.</div>';
+          return;
+        }
+        out.innerHTML = data
+          .map((m) => {
+            const ov = esc(m.overview);
+            const long = m.overview && m.overview.length > 140;
+            return `
+      <div class="r">
+        <div class="t">${esc(m.title)} <span>(${m.year})</span></div>
+        <div class="meta">★ ${m.rating} · ${esc(m.genre)} · dir. ${esc(
+              m.director
+            )}</div>
+        <div class="ov">${ov || "(no plot available)"}</div>
+        ${long ? '<span class="more">▾ read full plot</span>' : ""}
+      </div>`;
+          })
+          .join("");
+      }
+      // click "read full plot" to expand/collapse the plot above it
+      out.addEventListener("click", (e) => {
+        const btn = e.target.closest(".more");
+        if (!btn) return;
+        const ov = btn.previousElementSibling;
+        const open = ov.classList.toggle("open");
+        btn.textContent = open ? "▴ show less" : "▾ read full plot";
+      });
+      function esc(s) {
+        return (s || "").replace(
+          /[&<>"]/g,
+          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])
+        );
+      }
+    </script>
+  </body>
+</html>

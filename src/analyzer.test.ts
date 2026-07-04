@@ -1,50 +1,31 @@
 import { test, expect } from "vitest";
 import { tokenize } from "./analyzer.js";
 
-test("tokenize returns an array of words", () => {
-  const text = "Hello, world!";
-  const words = tokenize(text);
-  console.log(words);
-  expect(words).toEqual(["hello", "world"]);
+// tokenize also appends phonetic ("ph:") codes for fuzzy matching —
+// these tests check the plain word output, so we drop the phonetic ones.
+const words = (text: string) => tokenize(text).filter((t) => !t.startsWith("ph:"));
+
+test("lowercases and splits on punctuation", () => {
+  expect(words("Hello, world!")).toEqual(["hello", "world"]);
 });
 
-test("tokenize handles special characters", () => {
-  const text = "Hello, world! 🌍";
-  const words = tokenize(text);
-  console.log(words);
-  expect(words).toEqual(["hello", "world"]);
+test("strips emojis and symbols", () => {
+  expect(words("Hello, world! 🌍")).toEqual(["hello", "world"]);
 });
 
-test("tokenize handles multiple spaces", () => {
-  const text = "Hello,   world!";
-  const words = tokenize(text);
-  console.log(words);
-  expect(words).toEqual(["hello", "world"]);
+test("collapses multiple spaces", () => {
+  expect(words("Hello,   world!")).toEqual(["hello", "world"]);
 });
 
-test("tokenize handles punctuation", () => {
-  const text = "It's shoes";
-  const words = tokenize(text);
-  console.log(words);
-  expect(words).toEqual(["it", "shoes"]);
+test("splits contractions and drops stopwords + single chars", () => {
+  // "it" is a stopword, "s" is a single char → both dropped
+  expect(words("It's shoes")).toEqual(["shoes"]);
 });
 
-test("tokenize handles numbers", () => {
-  const text = "Hello, world! 123";
-  const words = tokenize(text);
-  console.log(words);
+test("keeps numbers", () => {
+  expect(words("Hello world 123")).toEqual(["hello", "world", "123"]);
 });
 
-test("tokensize handldes accents", () => {
-  const text = "Hello, world! àèéìòù";
-  const words = tokenize(text);
-  console.log(words);
-  expect(words).toEqual(["hello", "world", "aeeiou"]);
-});
-
-test("tokensize handldes emojis", () => {
-  const text = "Hello, world! 🌍";
-  const words = tokenize(text);
-  console.log(words);
-  expect(words).toEqual(["hello", "world"]);
+test("strips accents", () => {
+  expect(words("Hello world àèéìòù")).toEqual(["hello", "world", "aeeiou"]);
 });

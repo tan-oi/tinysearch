@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "tsx src/server.ts",
     "test": "vitest run",
     "eval": "tsx src/eval.ts",
     "vec": "tsx src/vec.ts",
@@ -17,12 +18,12 @@
   "type": "module",
   "devDependencies": {
     "@types/node": "^25.9.1",
-    "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
-    "double-metaphone": "^2.0.1"
+    "double-metaphone": "^2.0.1",
+    "tsx": "^4.22.3"
   }
 }

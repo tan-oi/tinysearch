@@ -7,35 +7,28 @@ type Doc = {
   content: string;
 };
 export class TinySearch {
-  private index: Map<string, Map<number, number>>;
-  private docs: Map<number, Doc>;
-  private docLengths: Map<number, number>;
-  private totalTokens: number;
-  private idf: Map<string, number>;
-  private norm: Map<number, number>;
-  private avgDl: number;
-  private postingDocs: Uint32Array = new Uint32Array(0);
-  private postingTfs: Uint16Array = new Uint16Array(0);
-  private offsets: Map<string, { start: number; len: number }> = new Map();
+  // lexical (BM25) state
+  private index = new Map<string, Map<number, number>>();
+  private docs = new Map<number, Doc>();
+  private docLengths = new Map<number, number>();
+  private totalTokens = 0;
+  private idf = new Map<string, number>();
+  private norm = new Map<number, number>();
+  private avgDl = 0;
+
+  // frozen index: flat postings + token → slice offsets
+  private postingDocs = new Uint32Array(0);
+  private postingTfs = new Uint16Array(0);
+  private offsets = new Map<string, { start: number; len: number }>();
 
   // vector lane: every doc vector laid flat (row i ↔ vectorIds[i]), normalized so dot == cosine
-  private vectors: Float32Array = new Float32Array(0);
-  private vectorIds: Uint32Array = new Uint32Array(0);
+  private vectors = new Float32Array(0);
+  private vectorIds = new Uint32Array(0);
   private dim = 0;
 
-  k1: number;
-  b: number;
-  constructor() {
-    this.index = new Map();
-    this.docs = new Map();
-    this.docLengths = new Map();
-    this.totalTokens = 0;
-    this.idf = new Map();
-    this.norm = new Map();
-    this.avgDl = 0;
-    this.k1 = 1.5;
-    this.b = 0.75;
-  }
+  // BM25 tuning knobs
+  k1 = 1.5;
+  b = 0.75;
 
   addDoc(doc: Doc) {
     const { id } = doc;
@@ -171,10 +164,6 @@ export class TinySearch {
     this.dim = JSON.parse(fs.readFileSync(`${dir}/vmeta.json`, "utf8")).dim;
   }
 
-  hasVectors() {
-    return this.vectorIds.length > 0;
-  }
-
   // brute-force semantic search: dot-product the query against every doc vector, heap the top-k.
   vectorSearch(queryVec: Float32Array, k = 10): Doc[] {
     const scores = new Map<number, number>();
@@ -220,47 +209,4 @@ export class TinySearch {
       .map(([id]) => this.docs.get(id)!);
   }
 
-  save(dir: string) {
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(
-      `${dir}/postingDocs.bin`,
-      Buffer.from(this.postingDocs.buffer)
-    );
-    fs.writeFileSync(
-      `${dir}/postingTfs.bin`,
-      Buffer.from(this.postingTfs.buffer)
-    );
-    const meta = {
-      avgDl: this.avgDl,
-      offsets: [...this.offsets],
-      idf: [...this.idf],
-      norm: [...this.norm],
-      docs: [...this.docs].map(([id, d]) => [id, d.content]),
-    };
-    fs.writeFileSync(`${dir}/meta.json`, JSON.stringify(meta));
-  }
-
-  // load a frozen index from disk — no ingest, no Map-of-Maps ever built
-  static load(dir: string): TinySearch {
-    const s = new TinySearch();
-
-    const pd = fs.readFileSync(`${dir}/postingDocs.bin`);
-    s.postingDocs = new Uint32Array(
-      pd.buffer.slice(pd.byteOffset, pd.byteOffset + pd.byteLength)
-    );
-    const pt = fs.readFileSync(`${dir}/postingTfs.bin`);
-    s.postingTfs = new Uint16Array(
-      pt.buffer.slice(pt.byteOffset, pt.byteOffset + pt.byteLength)
-    );
-
-    const meta = JSON.parse(fs.readFileSync(`${dir}/meta.json`, "utf8"));
-    s.avgDl = meta.avgDl;
-    s.offsets = new Map(meta.offsets);
-    s.idf = new Map(meta.idf);
-    s.norm = new Map(meta.norm);
-    s.docs = new Map(
-      meta.docs.map(([id, content]: [number, string]) => [id, { id, content }])
-    );
-    return s;
-  }
 }
